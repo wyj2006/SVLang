@@ -1,0 +1,18 @@
+@class MetaParser
+
+@subheader'''
+from meta_ast import *
+'''
+
+start : a=rule+ ENDMARKER { Grammar(a) }
+
+rule : a=NAME '=' b=choice { Rule(a.string,b) }
+
+choice : a=sequence b=('|' sequence)* { Choice(c) if (c:=([a]+[i[1] for i in b])) and len(c)>1 else c[0] }
+
+sequence : a=item+ { Sequence(a) if len(a)>1 else a[0] }
+
+item : '{' a=choice '}' { Repeat(a) }
+    | '[' a=choice ']' { Option(a) }
+    | a=NAME !'=' { Name(a.string) }
+    | a=STRING { String(a.string) }
