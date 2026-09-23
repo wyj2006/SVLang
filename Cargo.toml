@@ -9,10 +9,3 @@ codespan-reporting = "0.13.1"
 lazy_static = "1.5.0"
 pest = { version = "2.9.1", features = ["pretty-print"] }
 pest_derive = { version = "2.9.1", features = ["grammar-extras"] }
-
-[patch.crates-io]
-pest = { path = "pest/pest" }
-pest_derive = { path = "pest/derive" }
-pest_generator = { path = "pest/generator" }
-pest_meta = { path = "pest/meta" }
-pest_vm = { path = "pest/vm" }

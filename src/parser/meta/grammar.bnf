@@ -191,8 +191,8 @@ module_or_generate_item_declaration
 | elaboration_severity_system_task
 
 module_item ::=
-port_declaration ";"
-| non_port_module_item
+    non_port_module_item
+    | port_declaration ";"
 
 module_or_generate_item ::=
 { attribute_instance } parameter_override
@@ -423,7 +423,7 @@ constraint_primary ::= [ implicit_class_handle "." | class_scope ] hierarchical_
 constraint_expression ::=
 [ "soft" ] expression_or_dist ";"
 | uniqueness_constraint ";"
-| expression "–>" constraint_set
+| expression "->" constraint_set
 | "if" "(" expression ")" constraint_set [ "else" constraint_set ]
 | "foreach" "(" ps_or_hierarchical_array_identifier "[" loop_variables "]" ")" constraint_set
 | "disable" "soft" constraint_primary ";"
@@ -1438,9 +1438,11 @@ level_symbol ::= "0" | "1" | "x" | "X" | "?" | "b" | "B"
 edge_symbol ::= "r" | "R" | "f" | "F" | "p" | "P" | "n" | "N" | "*"
 udp_instantiation ::= udp_identifier [ drive_strength ] [ delay2 ] udp_instance { "," udp_instance } ";"
 
-udp_instance ::= [ name_of_instance ] "(" output_terminal "," input_terminal { "," input_terminal } ")"continuous_assign ::=
-"assign" [ drive_strength ] [ delay3 ] list_of_net_assignments ";"
-| "assign" [ delay_control ] list_of_variable_assignments ";"
+udp_instance ::= [ name_of_instance ] "(" output_terminal "," input_terminal { "," input_terminal } ")"
+
+continuous_assign ::=
+    "assign" [ delay_control ] list_of_variable_assignments ";"
+    | "assign" [ drive_strength ] [ delay3 ] list_of_net_assignments ";"
 
 list_of_net_assignments ::= net_assignment { "," net_assignment }
 
@@ -1586,8 +1588,8 @@ unique_priority ::= "unique" | "unique0" | "priority"
 cond_predicate ::= expression_or_cond_pattern { "&&&" expression_or_cond_pattern }
 
 expression_or_cond_pattern ::=
-expression
-| cond_pattern
+    cond_pattern
+    | expression
 
 cond_pattern ::= expression "matches" pattern
 case_statement ::=
@@ -2313,10 +2315,10 @@ decimal_number
 | hex_number
 
 decimal_number ::=
-unsigned_number
-| [ size ] decimal_base unsigned_number
-| [ size ] decimal_base x_digit { "_" }
-| [ size ] decimal_base z_digit { "_" }
+    [ size ] decimal_base unsigned_number
+    | [ size ] decimal_base x_digit { "_" }
+    | [ size ] decimal_base z_digit { "_" }
+    | unsigned_number
 
 binary_number ::= [ size ] binary_base binary_value
 
@@ -2329,8 +2331,8 @@ sign ::= "+" | "-"
 size ::= unsigned_number
 
 real_number ::=
-fixed_point_number
-| unsigned_number [ "." unsigned_number ] exp [ sign ] unsigned_number
+    unsigned_number [ "." unsigned_number ] exp [ sign ] unsigned_number
+    | fixed_point_number
 
 fixed_point_number ::= unsigned_number "." unsigned_number
 

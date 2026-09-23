@@ -16,15 +16,28 @@ class Grammar:
         return code
 
 
-@dataclass(frozen=True)
+@dataclass
 class Rule:
     name: str
     item: Item
+    is_silent: bool = False
+    is_atomic: bool = False
+    is_compound_atom: bool = False
 
     def to_pest(self):
-        code = f"{self.name} = {{"
+        code = f"{self.name} = "
+        if self.is_silent:
+            code += "_"
+        if self.is_atomic:
+            code += "@"
+        if self.is_compound_atom:
+            code += "$"
+        code += "{"
         code += self.item.to_pest()
         code += f"}}"
+        if len(code) > 80:
+            # 加入换行触发插件对pest文件的格式化
+            code = code[:-1] + "\n}"
         return code
 
     def first(self):
@@ -41,7 +54,7 @@ class Item:
     def expand(self):
         return self
 
-    def replace(self, old, new):
+    def replace(self, old: Item, new: Item):
         if self == old:
             return new
         return self
