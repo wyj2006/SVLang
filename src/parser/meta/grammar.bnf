@@ -12,7 +12,7 @@ library_declaration ::=
 
 include_statement ::= "include" file_path_spec ";"
 
-source_text ::= [ timeunits_declaration ] { description }
+source_text ::= SOI [ timeunits_declaration ] { description } EOI
 
 description ::=
 module_declaration
@@ -1469,7 +1469,7 @@ select "=" class_new
 
 operator_assignment ::= variable_lvalue assignment_operator expression
 
-assignment_operator ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" | "<<<=" | ">>>="
+assignment_operator ::= "<<<=" | ">>>=" | "<<=" | ">>=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "="
 
 nonblocking_assignment ::= variable_lvalue "<=" [ delay_or_event_control ] expression
 
@@ -1625,12 +1625,15 @@ randcase_item ::= expression ":" statement_or_null
 range_list ::= value_range { "," value_range }
 
 value_range ::=
-expression
-| "[" expression ":" expression "]"
-| "[" "$" ":" expression "]"
-| "[" expression ":" "$" "]"
-| "[" expression "+/-" expression "]"
-| "[" expression "+%-" expression "]"
+    "[" expression ":" expression "]"
+    | "[" min_bound ":" expression "]"
+    | "[" expression ":" max_bound "]"
+    | "[" expression "+/-" expression "]"
+    | "[" expression "+%-" expression "]"
+    | expression
+min_bound ::= "$"
+max_bound ::= "$"
+
 pattern ::=
 "(" pattern ")"
 | "." variable_identifier
@@ -2107,8 +2110,10 @@ tf_call
 function_subroutine_call ::= subroutine_call
 
 list_of_arguments ::=
-    "." identifier "(" [ expression ] ")" { "," "." identifier "(" [ expression ] ")" }
-    | [ expression ] { "," [ expression ] } { "," "." identifier "(" [ expression ] ")" }
+    "." identifier "(" [ expression ] ")" { argument_separator "." identifier "(" [ expression ] ")" }
+    | [ expression ] { argument_separator [ expression ] } { argument_separator "." identifier "(" [ expression ] ")" }
+
+argument_separator ::= ","
 
 method_call ::= method_call_root "." method_call_body
 
@@ -2181,8 +2186,8 @@ tagged_union_expression ::=
 inside_expression ::= expression "inside" "{" range_list "}"
 
 mintypmax_expression ::=
-expression
-| expression ":" expression ":" expression
+    expression ":" expression ":" expression
+    | expression
 
 module_path_conditional_expression ::= module_path_expression "?" { attribute_instance }
 module_path_expression ":" module_path_expression
@@ -2259,7 +2264,7 @@ unsigned_number time_unit
 
 time_unit ::= "s" | "ms" | "us" | "ns" | "ps" | "fs"
 
-implicit_class_handle ::= "this" | "super" | "this" "." "super"
+implicit_class_handle ::= "this" "." "super" | "this" | "super"
 
 bit_select ::= { "[" expression "]" }
 

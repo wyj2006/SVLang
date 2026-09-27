@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 codespan = "0.13.1"
 codespan-reporting = "0.13.1"
+indexmap = "2.14.2"
 lazy_static = "1.5.0"
 pest = { version = "2.9.1", features = ["pretty-print"] }
 pest_derive = { version = "2.9.1", features = ["grammar-extras"] }

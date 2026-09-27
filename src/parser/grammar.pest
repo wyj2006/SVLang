@@ -9,8 +9,8 @@ library_declaration                       =  {
     "library" ~ library_identifier ~ file_path_spec ~ ("," ~ file_path_spec)* ~ ("-incdir" ~ file_path_spec ~ ("," ~ file_path_spec)*)? ~ ";"
 }
 include_statement                         =  { "include" ~ file_path_spec ~ ";" }
-source_text                               =  { timeunits_declaration? ~ description* }
-description                               =  {
+source_text                               =  { SOI ~ timeunits_declaration? ~ description* ~ EOI }
+description                               = _{
     module_declaration
   | udp_declaration
   | interface_declaration
@@ -20,10 +20,10 @@ description                               =  {
   | attribute_instance* ~ bind_directive
   | config_declaration
 }
-module_nonansi_header                     =  {
+module_nonansi_header                     = _{
     attribute_instance* ~ module_keyword ~ lifetime? ~ module_identifier ~ package_import_declaration* ~ parameter_port_list? ~ list_of_ports ~ ";"
 }
-module_ansi_header                        =  {
+module_ansi_header                        = _{
     attribute_instance* ~ module_keyword ~ lifetime? ~ module_identifier ~ package_import_declaration* ~ parameter_port_list? ~ list_of_port_declarations? ~ ";"
 }
 module_declaration                        =  {
@@ -1078,7 +1078,10 @@ blocking_assignment                       =  {
 }
 operator_assignment                       =  { variable_lvalue ~ assignment_operator ~ expression }
 assignment_operator                       =  {
-    "="
+    "<<<="
+  | ">>>="
+  | "<<="
+  | ">>="
   | "+="
   | "-="
   | "*="
@@ -1087,10 +1090,7 @@ assignment_operator                       =  {
   | "&="
   | "|="
   | "^="
-  | "<<="
-  | ">>="
-  | "<<<="
-  | ">>>="
+  | "="
 }
 nonblocking_assignment                    =  {
     variable_lvalue ~ "<=" ~ delay_or_event_control? ~ expression
@@ -1196,13 +1196,15 @@ randcase_statement                        =  { "randcase" ~ randcase_item ~ rand
 randcase_item                             =  { expression ~ ":" ~ statement_or_null }
 range_list                                =  { value_range ~ ("," ~ value_range)* }
 value_range                               =  {
-    expression
-  | "[" ~ expression ~ ":" ~ expression ~ "]"
-  | "[" ~ "$" ~ ":" ~ expression ~ "]"
-  | "[" ~ expression ~ ":" ~ "$" ~ "]"
+    "[" ~ expression ~ ":" ~ expression ~ "]"
+  | "[" ~ min_bound ~ ":" ~ expression ~ "]"
+  | "[" ~ expression ~ ":" ~ max_bound ~ "]"
   | "[" ~ expression ~ "+/-" ~ expression ~ "]"
   | "[" ~ expression ~ "+%-" ~ expression ~ "]"
+  | expression
 }
+min_bound                                 =  { "$" }
+max_bound                                 =  { "$" }
 pattern                                   =  {
     "(" ~ pattern ~ ")"
   | "." ~ variable_identifier
@@ -1588,11 +1590,12 @@ subroutine_call                           =  {
   | method_call
   | ("std" ~ "::")? ~ randomize_call
 }
-function_subroutine_call                  =  { subroutine_call }
+function_subroutine_call                  = _{ subroutine_call }
 list_of_arguments                         =  {
-    "." ~ identifier ~ "(" ~ expression? ~ ")" ~ ("," ~ "." ~ identifier ~ "(" ~ expression? ~ ")")*
-  | expression? ~ ("," ~ expression?)* ~ ("," ~ "." ~ identifier ~ "(" ~ expression? ~ ")")*
+    "." ~ identifier ~ "(" ~ expression? ~ ")" ~ (argument_separator ~ "." ~ identifier ~ "(" ~ expression? ~ ")")*
+  | expression? ~ (argument_separator ~ expression?)* ~ (argument_separator ~ "." ~ identifier ~ "(" ~ expression? ~ ")")*
 }
+argument_separator                        =  { "," }
 method_call_body                          =  {
     method_identifier ~ attribute_instance* ~ ("(" ~ list_of_arguments ~ ")")?
   | built_in_method_call
@@ -1625,7 +1628,7 @@ constant_indexed_range                    =  {
   | constant_expression ~ "-:" ~ constant_expression
 }
 tagged_union_expression                   =  { "tagged" ~ member_identifier ~ primary? }
-mintypmax_expression                      =  { expression | expression ~ ":" ~ expression ~ ":" ~ expression }
+mintypmax_expression                      =  { expression ~ ":" ~ expression ~ ":" ~ expression | expression }
 module_path_mintypmax_expression          =  {
     module_path_expression ~ ":" ~ module_path_expression ~ ":" ~ module_path_expression
   | module_path_expression
@@ -1649,17 +1652,13 @@ range_expression                          =  { expression | part_select_range }
 primary_literal                           = _{ number | time_literal | unbased_unsized_literal | string_literal }
 time_literal                              = ${ unsigned_number ~ time_unit | fixed_point_number ~ time_unit }
 time_unit                                 =  { "s" | "ms" | "us" | "ns" | "ps" | "fs" }
-implicit_class_handle                     =  { "this" | "super" | "this" ~ "." ~ "super" }
+implicit_class_handle                     =  { "this" ~ "." ~ "super" | "this" | "super" }
 bit_select                                =  { ("[" ~ expression ~ "]")* }
 select                                    =  {
     (("." ~ member_identifier ~ bit_select)* ~ "." ~ member_identifier)? ~ bit_select ~ ("[" ~ part_select_range ~ "]")?
 }
 nonrange_select                           =  {
     (("." ~ member_identifier ~ bit_select)* ~ "." ~ member_identifier)? ~ bit_select
-}
-constant_bit_select                       =  { ("[" ~ constant_expression ~ "]")* }
-constant_select                           =  {
-    (("." ~ member_identifier ~ constant_bit_select)* ~ "." ~ member_identifier)? ~ constant_bit_select ~ ("[" ~ constant_part_select_range ~ "]")?
 }
 cast                                      =  { casting_type ~ "'" ~ "(" ~ expression ~ ")" }
 net_lvalue                                =  {
@@ -1679,33 +1678,33 @@ nonrange_variable_lvalue                  =  {
 inc_or_dec_operator                       =  { "++" | "--" }
 unary_module_path_operator                =  { "!" | "~" | "&" | "~&" | "|" | "~|" | "^" | "~^" | "^~" }
 binary_module_path_operator               =  { "==" | "!=" | "&&" | "||" | "&" | "|" | "^" | "^~" | "~^" }
-number                                    = _{ integral_number | real_number }
-integral_number                           = _{ decimal_number | octal_number | binary_number | hex_number }
-decimal_number                            = ${
+number                                    = ${ integral_number | real_number }
+integral_number                           = ${ decimal_number | octal_number | binary_number | hex_number }
+decimal_number                            = _{
     size? ~ decimal_base ~ unsigned_number
   | size? ~ decimal_base ~ x_digit ~ "_"*
   | size? ~ decimal_base ~ z_digit ~ "_"*
   | unsigned_number
 }
-binary_number                             = ${ size? ~ binary_base ~ binary_value }
-octal_number                              = ${ size? ~ octal_base ~ octal_value }
-hex_number                                =  { size? ~ hex_base ~ hex_value }
+binary_number                             = _{ size? ~ binary_base ~ binary_value }
+octal_number                              = _{ size? ~ octal_base ~ octal_value }
+hex_number                                = _{ size? ~ hex_base ~ hex_value }
 sign                                      =  { "+" | "-" }
 size                                      =  { unsigned_number }
 real_number                               = ${
     unsigned_number ~ ("." ~ unsigned_number)? ~ exp ~ sign? ~ unsigned_number
   | fixed_point_number
 }
-fixed_point_number                        = ${ unsigned_number ~ "." ~ unsigned_number }
+fixed_point_number                        = _{ unsigned_number ~ "." ~ unsigned_number }
 exp                                       =  { "e" | "E" }
-unsigned_number                           = @{ decimal_digit ~ ("_" | decimal_digit)* }
-binary_value                              = @{ binary_digit ~ ("_" | binary_digit)* }
-octal_value                               = @{ octal_digit ~ ("_" | octal_digit)* }
-hex_value                                 = @{ hex_digit ~ ("_" | hex_digit)* }
-decimal_base                              = @{ "'" ~ ("s" | "S")? ~ "d" | "'" ~ ("s" | "S")? ~ "D" }
-binary_base                               = @{ "'" ~ ("s" | "S")? ~ "b" | "'" ~ ("s" | "S")? ~ "B" }
-octal_base                                = @{ "'" ~ ("s" | "S")? ~ "o" | "'" ~ ("s" | "S")? ~ "O" }
-hex_base                                  = @{ "'" ~ ("s" | "S")? ~ "h" | "'" ~ ("s" | "S")? ~ "H" }
+unsigned_number                           =  { decimal_digit ~ ("_" | decimal_digit)* }
+binary_value                              =  { binary_digit ~ ("_" | binary_digit)* }
+octal_value                               =  { octal_digit ~ ("_" | octal_digit)* }
+hex_value                                 =  { hex_digit ~ ("_" | hex_digit)* }
+decimal_base                              =  { "'" ~ ("s" | "S")? ~ "d" | "'" ~ ("s" | "S")? ~ "D" }
+binary_base                               =  { "'" ~ ("s" | "S")? ~ "b" | "'" ~ ("s" | "S")? ~ "B" }
+octal_base                                =  { "'" ~ ("s" | "S")? ~ "o" | "'" ~ ("s" | "S")? ~ "O" }
+hex_base                                  =  { "'" ~ ("s" | "S")? ~ "h" | "'" ~ ("s" | "S")? ~ "H" }
 decimal_digit                             =  { "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" }
 binary_digit                              =  { x_digit | z_digit | "0" | "1" }
 octal_digit                               =  { x_digit | z_digit | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" }
@@ -1776,8 +1775,8 @@ hierarchical_parameter_identifier         =  { hierarchical_identifier }
 hierarchical_property_identifier          =  { hierarchical_identifier }
 hierarchical_sequence_identifier          =  { hierarchical_identifier }
 hierarchical_task_identifier              =  { hierarchical_identifier }
-hierarchical_tf_identifier                =  { hierarchical_identifier }
-hierarchical_variable_identifier          =  { hierarchical_identifier }
+hierarchical_tf_identifier                = _{ hierarchical_identifier }
+hierarchical_variable_identifier          = _{ hierarchical_identifier }
 index_variable_identifier                 =  { identifier }
 interface_identifier                      =  { identifier }
 interface_port_identifier                 =  { identifier }
@@ -1839,7 +1838,7 @@ udp_identifier                            =  { identifier }
 variable_identifier                       =  { identifier }
 
 keywords                  =  { "accept_on" | "alias" | "always" | "always_comb" | "always_ff" | "always_latch" | "and" | "assert" | "assign" | "assume" | "automatic" | "before" | "begin" | "bind" | "bins" | "binsof" | "bit" | "break" | "buf" | "bufif0" | "bufif1" | "byte" | "case" | "casex" | "casez" | "cell" | "chandle" | "checker" | "class" | "clocking" | "cmos" | "config" | "const" | "constraint" | "context" | "continue" | "cover" | "covergroup" | "coverpoint" | "cross" | "deassign" | "default" | "defparam" | "design" | "disable" | "dist" | "do" | "edge" | "else" | "end" | "endcase" | "endchecker" | "endclass" | "endclocking" | "endconfig" | "endfunction" | "endgenerate" | "endgroup" | "endinterface" | "endmodule" | "endpackage" | "endprimitive" | "endprogram" | "endproperty" | "endspecify" | "endsequence" | "endtable" | "endtask" | "enum" | "event" | "eventually" | "expect" | "export" | "extends" | "extern" | "final" | "first_match" | "for" | "force" | "foreach" | "forever" | "fork" | "forkjoin" | "function" | "generate" | "genvar" | "global" | "highz0" | "highz1" | "if" | "iff" | "ifnone" | "ignore_bins" | "illegal_bins" | "implements" | "implies" | "import" | "incdir" | "include" | "initial" | "inout" | "input" | "inside" | "instance" | "int" | "integer" | "interconnect" | "interface" | "intersect" | "join" | "join_any" | "join_none" | "large" | "let" | "liblist" | "library" | "local" | "localparam" | "logic" | "longint" | "macromodule" | "matches" | "medium" | "modport" | "module" | "nand" | "negedge" | "nettype" | "new" | "nexttime" | "nmos" | "nor" | "noshowcancelled" | "not" | "notif0" | "notif1" | "null" | "or" | "output" | "package" | "packed" | "parameter" | "pmos" | "posedge" | "primitive" | "priority" | "program" | "property" | "protected" | "pull0" | "pull1" | "pulldown" | "pullup" | "pulsestyle_ondetect" | "pulsestyle_onevent" | "pure" | "rand" | "randc" | "randcase" | "randsequence" | "rcmos" | "real" | "realtime" | "ref" | "reg" | "reject_on" | "release" | "repeat" | "restrict" | "return" | "rnmos" | "rpmos" | "rtran" | "rtranif0" | "rtranif1" | "s_always" | "s_eventually" | "s_nexttime" | "s_until" | "s_until_with" | "scalared" | "sequence" | "shortint" | "shortreal" | "showcancelled" | "signed" | "small" | "soft" | "solve" | "specify" | "specparam" | "static" | "string" | "strong" | "strong0" | "strong1" | "struct" | "super" | "supply0" | "supply1" | "sync_accept_on" | "sync_reject_on" | "table" | "tagged" | "task" | "this" | "throughout" | "time" | "timeprecision" | "timeunit" | "tran" | "tranif0" | "tranif1" | "tri" | "tri0" | "tri1" | "triand" | "trior" | "trireg" | "type" | "typedef" | "union" | "unique" | "unique0" | "unsigned" | "until" | "until_with" | "untyped" | "use" | "uwire" | "var" | "vectored" | "virtual" | "void" | "wait" | "wait_order" | "wand" | "weak" | "weak0" | "weak1" | "while" | "wildcard" | "wire" | "with" | "within" | "wor" | "xnor" | "xor" }
-identifier                = @{ !(keywords ~ !(ASCII_ALPHANUMERIC | "_" | "$")) ~ (simple_identifier | escaped_identifier) }
+identifier                = @{ !(keywords ~ !identifier_continue) ~ (simple_identifier | escaped_identifier) }
 quoted_string_item        = @{ !("\"" | NEWLINE | "\\") ~ ASCII }
 triple_quoted_string_item = @{ !"\\" ~ ASCII }
 COMMENT                   = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" | "/" ~ (!NEWLINE ~ ANY)* ~ NEWLINE }
@@ -1850,6 +1849,7 @@ system_tf_identifier      = @{ "$" ~ (ASCII_ALPHANUMERIC | "_" | "$")+ }
 WHITESPACE                = _{ " " | "\t" | NEWLINE }
 string_escape_seq         = @{ "\\x" ~ ASCII_HEX_DIGIT{1, 2} | "\\" ~ ASCII_OCT_DIGIT{1, 3} | "\\" ~ ASCII }
 file_path_spec            =  { "/" | "\\" }
+identifier_continue       =  { ASCII_ALPHANUMERIC | "_" | "$" }
 
 block_event_expression = { ("begin" | "end") ~ hierarchical_btf_identifier ~ ("or" ~ block_event_expression)* }
 
@@ -1959,14 +1959,11 @@ event_expression_recursive = {
   | "," ~ event_expression
 }
 
-cond_predicate      = _{ expression }
-constant_expression = _{ expression }
-constant_primary    = _{ expression }
-expression          =  { prefix? ~ primary ~ postfix? ~ (infix ~ prefix? ~ primary ~ postfix?)* }
+expression = { prefix? ~ primary ~ postfix? ~ (infix ~ prefix? ~ primary ~ postfix?)* }
 
-method_call  =  { implicit_class_handle ~ "." ~ method_call_body }
-casting_type =  { simple_type | signing | "string" | "const" }
-primary      = _{
+method_call  = { implicit_class_handle ~ "." ~ method_call_body }
+casting_type = { simple_type | signing | "string" | "const" }
+primary      = {
     "(" ~ operator_assignment ~ ")"
   | tagged_union_expression
   | inc_or_dec_expression
@@ -1991,7 +1988,6 @@ primary      = _{
   | formal_port_identifier ~ constant_select
   | (package_scope | class_scope)? ~ enum_identifier
   | type_reference
-  | "null"
 }
 
 prefix         = _{ reduction_xnor | reduction_nor | reduction_nand | positive | negative | not | bit_not | reduction_and | reduction_or | reduction_xor }
@@ -2022,28 +2018,30 @@ infix             = _{
   | pow
   | le
   | ge
-  | xnor
+  | bit_xnor
   | rshift
   | lshift
   | implication
   | cond_then
-  | cond_or
+  | cond_else
   | add
   | sub
   | mul
   | div
+  | mod
   | lt
   | gt
   | bit_and
   | bit_or
-  | xor
+  | bit_xor
 }
 cond_then         =  { "?" ~ attribute_instance* }
-cond_or           =  { ":" }
+cond_else         =  { ":" }
 add               =  { "+" ~ attribute_instance* }
 sub               =  { "-" ~ attribute_instance* }
 mul               =  { "*" ~ attribute_instance* }
 div               =  { "/" ~ attribute_instance* }
+mod               =  { "%" ~ attribute_instance* }
 eq                =  { "==" ~ attribute_instance* }
 neq               =  { "!=" ~ attribute_instance* }
 case_eq           =  { "===" ~ attribute_instance* }
@@ -2059,8 +2057,8 @@ gt                =  { ">" ~ attribute_instance* }
 ge                =  { ">=" ~ attribute_instance* }
 bit_and           =  { "&" ~ attribute_instance* }
 bit_or            =  { "|" ~ attribute_instance* }
-xor               =  { "^" ~ attribute_instance* }
-xnor              =  { ("^~" | "~^") ~ attribute_instance* }
+bit_xor           =  { "^" ~ attribute_instance* }
+bit_xnor          =  { ("^~" | "~^") ~ attribute_instance* }
 rshift            =  { ">>" ~ attribute_instance* }
 arithmetic_rshift =  { ">>>" ~ attribute_instance* }
 lshift            =  { "<<" ~ attribute_instance* }
@@ -2074,3 +2072,9 @@ inside         =  { "inside" ~ "{" ~ range_list ~ "}" }
 method_call_op =  { "." ~ method_call_body }
 cond_pattern   =  { "matches" ~ pattern }
 cast_op        =  { "'" ~ "(" ~ expression ~ ")" }
+
+cond_predicate      = _{ expression }
+constant_expression = _{ expression }
+constant_primary    = _{ expression }
+constant_select     = _{ select }
+constant_bit_select = _{ bit_select }

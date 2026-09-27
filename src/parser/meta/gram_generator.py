@@ -27,31 +27,33 @@ grammar: Grammar = parser.start()
 
 i = 0
 while i < len(grammar.rules):
-    if grammar.rules[i].name in ["number", "integral_number", "primary_literal"]:
+    if grammar.rules[i].name in [
+        "primary_literal",
+        "description",
+        "module_nonansi_header",
+        "module_ansi_header",
+        "hierarchical_variable_identifier",
+        "decimal_number",
+        "octal_number",
+        "binary_number",
+        "hex_number",
+        "fixed_point_number",
+        "function_subroutine_call",
+        "hierarchical_tf_identifier",
+    ]:
         grammar.rules[i].is_silent = True
     if grammar.rules[i].name in [
         "triple_quoted_string",
         "quoted_string",
         "string_literal",
         "unbased_unsized_literal",
-        "decimal_base",
-        "binary_base",
-        "octal_base",
-        "hex_base",
-        "unsigned_number",
-        "binary_value",
-        "octal_value",
-        "hex_value",
     ]:
         grammar.rules[i].is_atomic = True
     if grammar.rules[i].name in [
-        "real_number",
-        "fixed_point_number",
-        "binary_number",
-        "octal_number",
-        "binary_number",
-        "decimal_number",
         "time_literal",
+        "number",
+        "integral_number",
+        "real_number",
     ]:
         grammar.rules[i].is_compound_atom = True
     if grammar.rules[i].name in [
@@ -87,6 +89,8 @@ while i < len(grammar.rules):
         "constant_concatenation",
         "method_call_root",
         "identifier",
+        "constant_select",
+        "constant_bit_select",
     ]:
         grammar.rules.pop(i)
         continue
@@ -100,7 +104,7 @@ with open(
     file.write(grammar.to_pest())
     file.write(r"""
 keywords                  =  { "accept_on" | "alias" | "always" | "always_comb" | "always_ff" | "always_latch" | "and" | "assert" | "assign" | "assume" | "automatic" | "before" | "begin" | "bind" | "bins" | "binsof" | "bit" | "break" | "buf" | "bufif0" | "bufif1" | "byte" | "case" | "casex" | "casez" | "cell" | "chandle" | "checker" | "class" | "clocking" | "cmos" | "config" | "const" | "constraint" | "context" | "continue" | "cover" | "covergroup" | "coverpoint" | "cross" | "deassign" | "default" | "defparam" | "design" | "disable" | "dist" | "do" | "edge" | "else" | "end" | "endcase" | "endchecker" | "endclass" | "endclocking" | "endconfig" | "endfunction" | "endgenerate" | "endgroup" | "endinterface" | "endmodule" | "endpackage" | "endprimitive" | "endprogram" | "endproperty" | "endspecify" | "endsequence" | "endtable" | "endtask" | "enum" | "event" | "eventually" | "expect" | "export" | "extends" | "extern" | "final" | "first_match" | "for" | "force" | "foreach" | "forever" | "fork" | "forkjoin" | "function" | "generate" | "genvar" | "global" | "highz0" | "highz1" | "if" | "iff" | "ifnone" | "ignore_bins" | "illegal_bins" | "implements" | "implies" | "import" | "incdir" | "include" | "initial" | "inout" | "input" | "inside" | "instance" | "int" | "integer" | "interconnect" | "interface" | "intersect" | "join" | "join_any" | "join_none" | "large" | "let" | "liblist" | "library" | "local" | "localparam" | "logic" | "longint" | "macromodule" | "matches" | "medium" | "modport" | "module" | "nand" | "negedge" | "nettype" | "new" | "nexttime" | "nmos" | "nor" | "noshowcancelled" | "not" | "notif0" | "notif1" | "null" | "or" | "output" | "package" | "packed" | "parameter" | "pmos" | "posedge" | "primitive" | "priority" | "program" | "property" | "protected" | "pull0" | "pull1" | "pulldown" | "pullup" | "pulsestyle_ondetect" | "pulsestyle_onevent" | "pure" | "rand" | "randc" | "randcase" | "randsequence" | "rcmos" | "real" | "realtime" | "ref" | "reg" | "reject_on" | "release" | "repeat" | "restrict" | "return" | "rnmos" | "rpmos" | "rtran" | "rtranif0" | "rtranif1" | "s_always" | "s_eventually" | "s_nexttime" | "s_until" | "s_until_with" | "scalared" | "sequence" | "shortint" | "shortreal" | "showcancelled" | "signed" | "small" | "soft" | "solve" | "specify" | "specparam" | "static" | "string" | "strong" | "strong0" | "strong1" | "struct" | "super" | "supply0" | "supply1" | "sync_accept_on" | "sync_reject_on" | "table" | "tagged" | "task" | "this" | "throughout" | "time" | "timeprecision" | "timeunit" | "tran" | "tranif0" | "tranif1" | "tri" | "tri0" | "tri1" | "triand" | "trior" | "trireg" | "type" | "typedef" | "union" | "unique" | "unique0" | "unsigned" | "until" | "until_with" | "untyped" | "use" | "uwire" | "var" | "vectored" | "virtual" | "void" | "wait" | "wait_order" | "wand" | "weak" | "weak0" | "weak1" | "while" | "wildcard" | "wire" | "with" | "within" | "wor" | "xnor" | "xor" }
-identifier                = @{ !(keywords ~ !(ASCII_ALPHANUMERIC | "_" | "$")) ~ (simple_identifier | escaped_identifier) }
+identifier                = @{ !(keywords ~ !identifier_continue) ~ (simple_identifier | escaped_identifier) }
 quoted_string_item        = @{ !("\"" | NEWLINE | "\\") ~ ASCII }
 triple_quoted_string_item = @{ !"\\" ~ ASCII }
 COMMENT                   = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" | "/" ~ (!NEWLINE ~ ANY)* ~ NEWLINE }
@@ -111,6 +115,7 @@ system_tf_identifier      = @{ "$" ~ (ASCII_ALPHANUMERIC | "_" | "$")+ }
 WHITESPACE                =  _{ " " | "\t" | NEWLINE }
 string_escape_seq         = @{ "\\x" ~ ASCII_HEX_DIGIT{1, 2} | "\\" ~ ASCII_OCT_DIGIT{1, 3} | "\\" ~ ASCII }
 file_path_spec            =  { "/" | "\\" }
+identifier_continue       =  { ASCII_ALPHANUMERIC | "_" | "$" }
 
 block_event_expression = { ("begin" | "end") ~ hierarchical_btf_identifier ~ ("or" ~ block_event_expression)* }
 
@@ -220,14 +225,11 @@ event_expression_recursive = {
   | "," ~ event_expression
 }
 
-cond_predicate      = _{ expression }
-constant_expression = _{ expression }
-constant_primary    = _{ expression }
 expression          =  { prefix? ~ primary ~ postfix? ~ (infix ~ prefix? ~ primary ~ postfix?)* }
 
 method_call  =  { implicit_class_handle ~ "." ~ method_call_body }
 casting_type =  { simple_type | signing | "string" | "const" }
-primary      = _{
+primary      = {
     "(" ~ operator_assignment ~ ")"
   | tagged_union_expression
   | inc_or_dec_expression
@@ -252,7 +254,6 @@ primary      = _{
   | formal_port_identifier ~ constant_select
   | (package_scope | class_scope)? ~ enum_identifier
   | type_reference
-  | "null"
 }
 
 prefix         = _{ reduction_xnor | reduction_nor | reduction_nand | positive | negative | not | bit_not | reduction_and | reduction_or | reduction_xor }
@@ -283,28 +284,30 @@ infix             = _{
   | pow
   | le
   | ge
-  | xnor
+  | bit_xnor
   | rshift
   | lshift
   | implication
   | cond_then
-  | cond_or
+  | cond_else
   | add
   | sub
   | mul
   | div
+  | mod
   | lt
   | gt
   | bit_and
   | bit_or
-  | xor
+  | bit_xor
 }
 cond_then         =  { "?" ~ attribute_instance* }
-cond_or           =  { ":" }
+cond_else         =  { ":" }
 add               =  { "+" ~ attribute_instance* }
 sub               =  { "-" ~ attribute_instance* }
 mul               =  { "*" ~ attribute_instance* }
 div               =  { "/" ~ attribute_instance* }
+mod               =  { "%" ~ attribute_instance* }
 eq                =  { "==" ~ attribute_instance* }
 neq               =  { "!=" ~ attribute_instance* }
 case_eq           =  { "===" ~ attribute_instance* }
@@ -320,8 +323,8 @@ gt                =  { ">" ~ attribute_instance* }
 ge                =  { ">=" ~ attribute_instance* }
 bit_and           =  { "&" ~ attribute_instance* }
 bit_or            =  { "|" ~ attribute_instance* }
-xor               =  { "^" ~ attribute_instance* }
-xnor              =  { ("^~" | "~^") ~ attribute_instance* }
+bit_xor           =  { "^" ~ attribute_instance* }
+bit_xnor          =  { ("^~" | "~^") ~ attribute_instance* }
 rshift            =  { ">>" ~ attribute_instance* }
 arithmetic_rshift =  { ">>>" ~ attribute_instance* }
 lshift            =  { "<<" ~ attribute_instance* }
@@ -335,4 +338,10 @@ inside         =  { "inside" ~ "{" ~ range_list ~ "}" }
 method_call_op =  { "." ~ method_call_body }
 cond_pattern   =  { "matches" ~ pattern }
 cast_op        =  { "'" ~ "(" ~ expression ~ ")" }
+
+cond_predicate      = _{ expression }
+constant_expression = _{ expression }
+constant_primary    = _{ expression }
+constant_select     = _{ select }
+constant_bit_select = _{ bit_select }
 """)
