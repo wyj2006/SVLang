@@ -9,56 +9,7 @@ use crate::{
     parser::{Rule, SVParser},
 };
 use codespan_reporting::diagnostic::Diagnostic;
-use pest::{
-    iterators::Pair,
-    pratt_parser::{Assoc, Op, PrattParser},
-};
-use std::sync::LazyLock;
-
-static PRATT: LazyLock<PrattParser<Rule>> = LazyLock::new(|| {
-    PrattParser::new()
-        .op(Op::infix(Rule::triple_amp, Assoc::Left))
-        .op(Op::infix(Rule::implication, Assoc::Right) | Op::infix(Rule::logical_eq, Assoc::Right))
-        .op(Op::infix(Rule::cond_then, Assoc::Left) | Op::infix(Rule::cond_else, Assoc::Right))
-        .op(Op::infix(Rule::or, Assoc::Left))
-        .op(Op::infix(Rule::and, Assoc::Left))
-        .op(Op::infix(Rule::bit_or, Assoc::Left))
-        .op(Op::infix(Rule::bit_xor, Assoc::Left) | Op::infix(Rule::bit_xnor, Assoc::Left))
-        .op(Op::infix(Rule::bit_and, Assoc::Left))
-        .op(Op::infix(Rule::eq, Assoc::Left)
-            | Op::infix(Rule::neq, Assoc::Left)
-            | Op::infix(Rule::case_eq, Assoc::Left)
-            | Op::infix(Rule::case_neq, Assoc::Left)
-            | Op::infix(Rule::wildcard_eq, Assoc::Left)
-            | Op::infix(Rule::wildcard_neq, Assoc::Left))
-        .op(Op::infix(Rule::lt, Assoc::Left)
-            | Op::infix(Rule::le, Assoc::Left)
-            | Op::infix(Rule::gt, Assoc::Left)
-            | Op::infix(Rule::ge, Assoc::Left))
-        .op(Op::infix(Rule::lshift, Assoc::Left)
-            | Op::infix(Rule::arithmetic_lshift, Assoc::Left)
-            | Op::infix(Rule::rshift, Assoc::Left)
-            | Op::infix(Rule::arithmetic_rshift, Assoc::Left))
-        .op(Op::infix(Rule::add, Assoc::Left) | Op::infix(Rule::sub, Assoc::Left))
-        .op(Op::infix(Rule::mul, Assoc::Left)
-            | Op::infix(Rule::div, Assoc::Left)
-            | Op::infix(Rule::r#mod, Assoc::Left))
-        .op(Op::infix(Rule::pow, Assoc::Left))
-        .op(Op::prefix(Rule::positive)
-            | Op::prefix(Rule::negative)
-            | Op::prefix(Rule::not)
-            | Op::prefix(Rule::bit_not)
-            | Op::prefix(Rule::reduction_and)
-            | Op::prefix(Rule::reduction_nand)
-            | Op::prefix(Rule::reduction_or)
-            | Op::prefix(Rule::reduction_nor)
-            | Op::prefix(Rule::reduction_xor)
-            | Op::prefix(Rule::reduction_xnor))
-        .op(Op::postfix(Rule::inside)
-            | Op::postfix(Rule::method_call_op)
-            | Op::postfix(Rule::cond_pattern)
-            | Op::postfix(Rule::cast_op))
-});
+use pest::iterators::Pair;
 
 impl SVParser {
     pub fn parse_select(
@@ -193,222 +144,6 @@ impl SVParser {
                 },
             },
         ))
-    }
-
-    pub fn parse_expression(&self, pair: Pair<Rule>) -> Result<Expression, Diagnostic<FileId>> {
-        PRATT
-            .map_primary(|pair| {
-                let mut expr = None;
-                let mut access_kind = None;
-
-                for pair in pair.into_inner() {
-                    let span = from_pest_span(pair.as_span());
-                    match pair.as_rule() {
-                        Rule::operator_assignment => {
-                            expr = Some(self.parse_operator_assignment(pair)?)
-                        }
-                        Rule::inc_or_dec_expression => {
-                            expr = Some(self.parse_inc_or_dec_expression(pair)?)
-                        }
-                        Rule::number => expr = Some(self.parse_number(pair)?),
-                        Rule::package_scope => {
-                            access_kind = Some(AccessKind::Scope);
-                            expr = Some(self.parse_package_scope(pair)?);
-                        }
-                        Rule::hierarchical_identifier => {
-                            expr =
-                                Some(self.parse_hierarchical_identifier(pair, expr, access_kind)?)
-                        }
-                        Rule::select => expr = Some(self.parse_select(expr.unwrap(), pair)?),
-                        Rule::empty_unpacked_array_concatenation => {
-                            expr = Some(Expression::new(
-                                self.file_id,
-                                span,
-                                ExprKind::Concat(vec![]),
-                            ))
-                        }
-                        Rule::concatenation => expr = Some(self.parse_concatenation(pair)?),
-                        Rule::range_expression => {
-                            expr = Some(self.parse_range_expression(expr.unwrap(), pair)?)
-                        }
-                        Rule::multiple_concatenation => {
-                            expr = Some(self.parse_multiple_concatenation(pair)?)
-                        }
-                        Rule::subroutine_call => expr = Some(self.parse_subroutine_call(pair)?),
-                        Rule::mintypmax_expression => {
-                            expr = Some(self.parse_mintypmax_expression(pair)?)
-                        }
-                        Rule::cast => expr = Some(self.parse_cast(pair)?),
-                        _ => match pair.as_str() {
-                            "this" => {
-                                expr = Some(Expression::new(self.file_id, span, ExprKind::This))
-                            }
-                            "$" => {
-                                expr = Some(Expression::new(self.file_id, span, ExprKind::Dollar))
-                            }
-                            "null" => {
-                                expr = Some(Expression::new(self.file_id, span, ExprKind::Null))
-                            }
-                            "" => {}
-                            _ => todo!(),
-                        },
-                    }
-                }
-
-                Ok(expr.unwrap())
-            })
-            .map_prefix(|pair, operand| {
-                let operand = operand?;
-                let span = from_pest_span(pair.as_span());
-                Ok(Expression::new(
-                    self.file_id,
-                    span,
-                    ExprKind::UnaryOp {
-                        op: match pair.as_rule() {
-                            Rule::positive => UnaryOpKind::Positive,
-                            Rule::negative => UnaryOpKind::Negative,
-                            Rule::not => UnaryOpKind::Not,
-                            Rule::bit_not => UnaryOpKind::BitNot,
-                            Rule::reduction_and => UnaryOpKind::ReductionAnd,
-                            Rule::reduction_nand => UnaryOpKind::ReductionNAnd,
-                            Rule::reduction_or => UnaryOpKind::ReductionOr,
-                            Rule::reduction_nor => UnaryOpKind::ReductionNOr,
-                            Rule::reduction_xor => UnaryOpKind::ReductionXor,
-                            Rule::reduction_xnor => UnaryOpKind::ReductionXNor,
-                            _ => unreachable!(),
-                        },
-                        operand: Box::new(operand),
-                    },
-                ))
-            })
-            .map_postfix(|operand, pair| {
-                let operand = operand?;
-                let span = from_pest_span(pair.as_span());
-
-                match pair.as_rule() {
-                    Rule::cast_op => {
-                        let mut expr = None;
-                        for pair in pair.into_inner() {
-                            match pair.as_rule() {
-                                Rule::expression => expr = Some(self.parse_expression(pair)?),
-                                _ => unreachable!(),
-                            }
-                        }
-                        Ok(Expression::new(
-                            self.file_id,
-                            span,
-                            ExprKind::Cast {
-                                expr: Box::new(expr.unwrap()),
-                                target: Box::new(CastTarget::Expr(operand)),
-                            },
-                        ))
-                    }
-                    Rule::inside => {
-                        let mut ranges = vec![];
-
-                        for pair in pair.into_inner() {
-                            match pair.as_rule() {
-                                Rule::range_list => ranges = self.parse_range_list(pair)?,
-                                _ => unreachable!(),
-                            }
-                        }
-
-                        Ok(Expression::new(
-                            self.file_id,
-                            span,
-                            ExprKind::Inside {
-                                expr: Box::new(operand),
-                                ranges,
-                            },
-                        ))
-                    }
-                    Rule::cond_pattern => {
-                        let mut pattern = None;
-
-                        for pair in pair.into_inner() {
-                            match pair.as_rule() {
-                                Rule::pattern => pattern = Some(self.parse_pattern(pair)?),
-                                _ => unreachable!(),
-                            }
-                        }
-
-                        Ok(Expression::new(
-                            self.file_id,
-                            span,
-                            ExprKind::Matches {
-                                expr: Box::new(operand),
-                                pattern: Box::new(pattern.unwrap()),
-                            },
-                        ))
-                    }
-                    _ => todo!(),
-                }
-            })
-            .map_infix(|left, pair, right| {
-                let mut left = left?;
-                let right = right?;
-                let span = from_pest_span(pair.as_span());
-
-                match pair.as_rule() {
-                    Rule::cond_then => Ok(Expression::new(
-                        self.file_id,
-                        span,
-                        ExprKind::Conditional {
-                            cond: Box::new(left),
-                            then: Box::new(right),
-                            r#else: Box::new(Expression::new_error(self.file_id, span)),
-                        },
-                    )),
-                    Rule::cond_else => {
-                        match &mut left.kind {
-                            ExprKind::Conditional { r#else, .. } => *r#else = Box::new(right),
-                            _ => unreachable!(),
-                        }
-                        Ok(left)
-                    }
-                    _ => Ok(Expression::new(
-                        self.file_id,
-                        span,
-                        ExprKind::BinOp {
-                            op: match pair.as_rule() {
-                                Rule::add => BinOpKind::Add,
-                                Rule::sub => BinOpKind::Sub,
-                                Rule::mul => BinOpKind::Mul,
-                                Rule::div => BinOpKind::Div,
-                                Rule::r#mod => BinOpKind::Mod,
-                                Rule::eq => BinOpKind::Eq,
-                                Rule::neq => BinOpKind::Neq,
-                                Rule::case_eq => BinOpKind::CaseEq,
-                                Rule::case_neq => BinOpKind::CaseNeq,
-                                Rule::wildcard_eq => BinOpKind::WildCardEq,
-                                Rule::wildcard_neq => BinOpKind::WildCardNeq,
-                                Rule::and => BinOpKind::And,
-                                Rule::or => BinOpKind::Or,
-                                Rule::pow => BinOpKind::Pow,
-                                Rule::lt => BinOpKind::Lt,
-                                Rule::le => BinOpKind::Le,
-                                Rule::gt => BinOpKind::Gt,
-                                Rule::ge => BinOpKind::Ge,
-                                Rule::bit_and => BinOpKind::BitAnd,
-                                Rule::bit_or => BinOpKind::BitOr,
-                                Rule::bit_xor => BinOpKind::BitXor,
-                                Rule::bit_xnor => BinOpKind::BitXNor,
-                                Rule::rshift => BinOpKind::RShift,
-                                Rule::arithmetic_rshift => BinOpKind::ArithRShift,
-                                Rule::lshift => BinOpKind::LShift,
-                                Rule::arithmetic_lshift => BinOpKind::ArithLShift,
-                                Rule::implication => BinOpKind::Implication,
-                                Rule::logical_eq => BinOpKind::LogicalEq,
-                                Rule::triple_amp => BinOpKind::TripleAmp,
-                                _ => todo!(),
-                            },
-                            left: Box::new(left),
-                            right: Box::new(right),
-                        },
-                    )),
-                }
-            })
-            .parse(pair.into_inner())
     }
 
     pub fn parse_operator_assignment(
@@ -599,50 +334,6 @@ impl SVParser {
         }
 
         Ok(expr.unwrap())
-    }
-
-    pub fn parse_inc_or_dec_expression(
-        &self,
-        pair: Pair<Rule>,
-    ) -> Result<Expression, Diagnostic<FileId>> {
-        let mut op = UnaryOpKind::PrefixInc;
-        let mut operand = None;
-        let span = from_pest_span(pair.as_span());
-
-        for pair in pair.into_inner() {
-            match pair.as_rule() {
-                Rule::inc_or_dec_operator => match (pair.as_str(), op) {
-                    ("++", UnaryOpKind::PrefixDec | UnaryOpKind::PrefixInc) => {
-                        op = UnaryOpKind::PrefixInc
-                    }
-                    ("++", UnaryOpKind::PostfixDec | UnaryOpKind::PostfixInc) => {
-                        op = UnaryOpKind::PostfixInc
-                    }
-                    ("--", UnaryOpKind::PrefixDec | UnaryOpKind::PrefixInc) => {
-                        op = UnaryOpKind::PrefixDec
-                    }
-                    ("--", UnaryOpKind::PostfixDec | UnaryOpKind::PostfixInc) => {
-                        op = UnaryOpKind::PostfixDec
-                    }
-                    _ => unreachable!(),
-                },
-                Rule::variable_lvalue => {
-                    op = UnaryOpKind::PostfixInc;
-                    operand = Some(self.parse_variable_lvalue(pair)?);
-                }
-                Rule::attribute_instance => todo!(),
-                _ => unreachable!(),
-            }
-        }
-
-        Ok(Expression::new(
-            self.file_id,
-            span,
-            ExprKind::UnaryOp {
-                op,
-                operand: Box::new(operand.unwrap()),
-            },
-        ))
     }
 
     pub fn parse_number(&self, pair: Pair<Rule>) -> Result<Expression, Diagnostic<FileId>> {
@@ -1092,5 +783,238 @@ impl SVParser {
                 return Ok(patterns.remove(0));
             },
         ))
+    }
+
+    pub fn parse_expression(&self, pair: Pair<Rule>) -> Result<Expression, Diagnostic<FileId>> {
+        let mut left = None;
+        let mut op = None;
+
+        for pair in pair.into_inner() {
+            let span = from_pest_span(pair.as_span());
+            match pair.as_rule() {
+                Rule::conditional_expression => {
+                    if let None = left {
+                        left = Some(self.parse_conditional_expression(pair)?)
+                    } else {
+                        left = Some(Expression::new(
+                            self.file_id,
+                            span,
+                            ExprKind::BinOp {
+                                op: op.unwrap(),
+                                left: Box::new(left.unwrap()),
+                                right: Box::new(self.parse_conditional_expression(pair)?),
+                            },
+                        ))
+                    }
+                }
+                Rule::implication => op = Some(BinOpKind::Implication),
+                Rule::logical_eq => op = Some(BinOpKind::LogicalEq),
+                _ => unreachable!(),
+            }
+        }
+
+        Ok(left.unwrap())
+    }
+
+    pub fn parse_conditional_expression(
+        &self,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Diagnostic<FileId>> {
+        let mut cond = None;
+        let mut then = None;
+        let mut r#else = None;
+        let span = from_pest_span(pair.as_span());
+
+        for pair in pair.into_inner() {
+            match pair.as_rule() {
+                Rule::cond_predicate => cond = Some(self.parse_cond_predicate(pair)?),
+                Rule::expression => {
+                    if let None = then {
+                        then = Some(self.parse_expression(pair)?);
+                    } else {
+                        r#else = Some(self.parse_expression(pair)?);
+                    }
+                }
+                _ => todo!(),
+            }
+        }
+
+        if let None = then {
+            Ok(cond.unwrap())
+        } else {
+            Ok(Expression::new(
+                self.file_id,
+                span,
+                ExprKind::Conditional {
+                    cond: Box::new(cond.unwrap()),
+                    then: Box::new(then.unwrap()),
+                    r#else: Box::new(r#else.unwrap()),
+                },
+            ))
+        }
+    }
+
+    pub fn parse_cond_predicate(&self, pair: Pair<Rule>) -> Result<Expression, Diagnostic<FileId>> {
+        let mut exprs = vec![];
+        let span = from_pest_span(pair.as_span());
+
+        for pair in pair.into_inner() {
+            match pair.as_rule() {
+                Rule::expression_or_cond_pattern => {
+                    exprs.push(self.parse_expression_or_cond_pattern(pair)?)
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        if exprs.len() == 1 {
+            Ok(exprs.remove(0))
+        } else {
+            Ok(Expression::new(
+                self.file_id,
+                span,
+                ExprKind::CondPredicate(exprs),
+            ))
+        }
+    }
+
+    pub fn parse_expression_or_cond_pattern(
+        &self,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Diagnostic<FileId>> {
+        let mut expr = None;
+        let mut pattern = None;
+        let span = from_pest_span(pair.as_span());
+
+        for pair in pair.into_inner() {
+            match pair.as_rule() {
+                Rule::or_expression => expr = Some(self.parse_or_expression(pair)?),
+                Rule::pattern => pattern = Some(self.parse_pattern(pair)?),
+                _ => unreachable!(),
+            }
+        }
+
+        if let None = pattern {
+            Ok(expr.unwrap())
+        } else {
+            Ok(Expression::new(
+                self.file_id,
+                span,
+                ExprKind::Matches {
+                    expr: Box::new(expr.unwrap()),
+                    pattern: Box::new(pattern.unwrap()),
+                },
+            ))
+        }
+    }
+
+    pub fn parse_unary_expression(
+        &self,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Diagnostic<FileId>> {
+        let mut prefix = vec![];
+        let mut expr = None;
+        let span = from_pest_span(pair.as_span());
+
+        for pair in pair.into_inner() {
+            let span = from_pest_span(pair.as_span());
+            match pair.as_rule() {
+                Rule::primary => expr = Some(self.parse_primary(pair)?),
+                //后缀运算符的优先级比前缀高
+                Rule::postfix_inc => {
+                    expr = Some(Expression::new(
+                        self.file_id,
+                        span,
+                        ExprKind::UnaryOp {
+                            op: UnaryOpKind::PostfixInc,
+                            operand: Box::new(expr.unwrap()),
+                        },
+                    ))
+                }
+                Rule::postfix_dec => {
+                    expr = Some(Expression::new(
+                        self.file_id,
+                        span,
+                        ExprKind::UnaryOp {
+                            op: UnaryOpKind::PostfixDec,
+                            operand: Box::new(expr.unwrap()),
+                        },
+                    ))
+                }
+                Rule::positive => prefix.push(UnaryOpKind::Positive),
+                Rule::negative => prefix.push(UnaryOpKind::Negative),
+                Rule::not => prefix.push(UnaryOpKind::Not),
+                Rule::bit_not => prefix.push(UnaryOpKind::BitNot),
+                Rule::reduction_and => prefix.push(UnaryOpKind::ReductionAnd),
+                Rule::reduction_nand => prefix.push(UnaryOpKind::ReductionNAnd),
+                Rule::reduction_or => prefix.push(UnaryOpKind::ReductionOr),
+                Rule::reduction_nor => prefix.push(UnaryOpKind::ReductionNOr),
+                Rule::reduction_xor => prefix.push(UnaryOpKind::ReductionXor),
+                Rule::reduction_xnor => prefix.push(UnaryOpKind::ReductionXNor),
+                Rule::prefix_inc => prefix.push(UnaryOpKind::PostfixInc),
+                Rule::prefix_dec => prefix.push(UnaryOpKind::PrefixDec),
+                _ => todo!(),
+            }
+        }
+
+        for prefix in prefix.iter().rev() {
+            expr = Some(Expression::new(
+                self.file_id,
+                span,
+                ExprKind::UnaryOp {
+                    op: *prefix,
+                    operand: Box::new(expr.unwrap()),
+                },
+            ))
+        }
+
+        Ok(expr.unwrap())
+    }
+
+    pub fn parse_primary(&self, pair: Pair<Rule>) -> Result<Expression, Diagnostic<FileId>> {
+        let mut expr = None;
+        let mut access_kind = None;
+
+        for pair in pair.into_inner() {
+            let span = from_pest_span(pair.as_span());
+            match pair.as_rule() {
+                Rule::operator_assignment => expr = Some(self.parse_operator_assignment(pair)?),
+                Rule::number => expr = Some(self.parse_number(pair)?),
+                Rule::package_scope => {
+                    access_kind = Some(AccessKind::Scope);
+                    expr = Some(self.parse_package_scope(pair)?);
+                }
+                Rule::hierarchical_identifier => {
+                    expr = Some(self.parse_hierarchical_identifier(pair, expr, access_kind)?)
+                }
+                Rule::select => expr = Some(self.parse_select(expr.unwrap(), pair)?),
+                Rule::empty_unpacked_array_concatenation => {
+                    expr = Some(Expression::new(
+                        self.file_id,
+                        span,
+                        ExprKind::Concat(vec![]),
+                    ))
+                }
+                Rule::concatenation => expr = Some(self.parse_concatenation(pair)?),
+                Rule::range_expression => {
+                    expr = Some(self.parse_range_expression(expr.unwrap(), pair)?)
+                }
+                Rule::multiple_concatenation => {
+                    expr = Some(self.parse_multiple_concatenation(pair)?)
+                }
+                Rule::subroutine_call => expr = Some(self.parse_subroutine_call(pair)?),
+                Rule::mintypmax_expression => expr = Some(self.parse_mintypmax_expression(pair)?),
+                Rule::cast => expr = Some(self.parse_cast(pair)?),
+                _ => match pair.as_str() {
+                    "this" => expr = Some(Expression::new(self.file_id, span, ExprKind::This)),
+                    "$" => expr = Some(Expression::new(self.file_id, span, ExprKind::Dollar)),
+                    "null" => expr = Some(Expression::new(self.file_id, span, ExprKind::Null)),
+                    "" => {}
+                    _ => todo!(),
+                },
+            }
+        }
+
+        Ok(expr.unwrap())
     }
 }

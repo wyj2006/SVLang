@@ -139,7 +139,7 @@ pub enum ExprKind {
         typical: Box<Expression>,
         max: Box<Expression>,
     },
-    Error,
+    CondPredicate(Vec<Expression>),
 }
 
 impl Expression {
@@ -150,10 +150,6 @@ impl Expression {
             span,
             kind,
         }
-    }
-
-    pub fn new_error(file_id: FileId, span: Span) -> Expression {
-        Expression::new(file_id, span, ExprKind::Error)
     }
 }
 
@@ -230,7 +226,6 @@ pub enum BinOpKind {
     ArithLShift,
     Implication,
     LogicalEq,
-    TripleAmp,
 }
 
 #[derive(Debug, Clone, Copy)]

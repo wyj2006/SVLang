@@ -1,5 +1,6 @@
 pub mod parse_decl;
 pub mod parse_expr;
+pub mod parse_infix;
 pub mod parse_type;
 
 use crate::{

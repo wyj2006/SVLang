@@ -1168,10 +1168,10 @@ disable_statement                         =  {
   | "disable" ~ hierarchical_block_identifier ~ ";"
   | "disable" ~ "fork" ~ ";"
 }
-conditional_statement                     =  {
-    unique_priority? ~ "if" ~ "(" ~ cond_predicate ~ ")" ~ statement_or_null ~ ("else" ~ "if" ~ "(" ~ cond_predicate ~ ")" ~ statement_or_null)* ~ ("else" ~ statement_or_null)?
-}
 unique_priority                           =  { "unique" | "unique0" | "priority" }
+cond_predicate                            =  {
+    expression_or_cond_pattern ~ ("&&&" ~ expression_or_cond_pattern)*
+}
 case_statement                            =  {
     unique_priority? ~ case_keyword ~ "(" ~ case_expression ~ ")" ~ case_item ~ case_item* ~ "endcase"
   | unique_priority? ~ case_keyword ~ "(" ~ case_expression ~ ")" ~ "matches" ~ case_pattern_item ~ case_pattern_item* ~ "endcase"
@@ -1610,10 +1610,6 @@ randomize_call                            =  {
 variable_identifier_list                  =  { variable_identifier ~ ("," ~ variable_identifier)* }
 identifier_list                           =  { identifier ~ ("," ~ identifier)* }
 array_method_name                         =  { method_identifier | "unique" | "and" | "or" | "xor" }
-inc_or_dec_expression                     =  {
-    inc_or_dec_operator ~ attribute_instance* ~ variable_lvalue
-  | variable_lvalue ~ attribute_instance* ~ inc_or_dec_operator
-}
 constant_mintypmax_expression             =  {
     constant_expression
   | constant_expression ~ ":" ~ constant_expression ~ ":" ~ constant_expression
@@ -1836,20 +1832,19 @@ topmodule_identifier                      =  { identifier }
 type_identifier                           =  { identifier }
 udp_identifier                            =  { identifier }
 variable_identifier                       =  { identifier }
-
-keywords                  =  { "accept_on" | "alias" | "always" | "always_comb" | "always_ff" | "always_latch" | "and" | "assert" | "assign" | "assume" | "automatic" | "before" | "begin" | "bind" | "bins" | "binsof" | "bit" | "break" | "buf" | "bufif0" | "bufif1" | "byte" | "case" | "casex" | "casez" | "cell" | "chandle" | "checker" | "class" | "clocking" | "cmos" | "config" | "const" | "constraint" | "context" | "continue" | "cover" | "covergroup" | "coverpoint" | "cross" | "deassign" | "default" | "defparam" | "design" | "disable" | "dist" | "do" | "edge" | "else" | "end" | "endcase" | "endchecker" | "endclass" | "endclocking" | "endconfig" | "endfunction" | "endgenerate" | "endgroup" | "endinterface" | "endmodule" | "endpackage" | "endprimitive" | "endprogram" | "endproperty" | "endspecify" | "endsequence" | "endtable" | "endtask" | "enum" | "event" | "eventually" | "expect" | "export" | "extends" | "extern" | "final" | "first_match" | "for" | "force" | "foreach" | "forever" | "fork" | "forkjoin" | "function" | "generate" | "genvar" | "global" | "highz0" | "highz1" | "if" | "iff" | "ifnone" | "ignore_bins" | "illegal_bins" | "implements" | "implies" | "import" | "incdir" | "include" | "initial" | "inout" | "input" | "inside" | "instance" | "int" | "integer" | "interconnect" | "interface" | "intersect" | "join" | "join_any" | "join_none" | "large" | "let" | "liblist" | "library" | "local" | "localparam" | "logic" | "longint" | "macromodule" | "matches" | "medium" | "modport" | "module" | "nand" | "negedge" | "nettype" | "new" | "nexttime" | "nmos" | "nor" | "noshowcancelled" | "not" | "notif0" | "notif1" | "null" | "or" | "output" | "package" | "packed" | "parameter" | "pmos" | "posedge" | "primitive" | "priority" | "program" | "property" | "protected" | "pull0" | "pull1" | "pulldown" | "pullup" | "pulsestyle_ondetect" | "pulsestyle_onevent" | "pure" | "rand" | "randc" | "randcase" | "randsequence" | "rcmos" | "real" | "realtime" | "ref" | "reg" | "reject_on" | "release" | "repeat" | "restrict" | "return" | "rnmos" | "rpmos" | "rtran" | "rtranif0" | "rtranif1" | "s_always" | "s_eventually" | "s_nexttime" | "s_until" | "s_until_with" | "scalared" | "sequence" | "shortint" | "shortreal" | "showcancelled" | "signed" | "small" | "soft" | "solve" | "specify" | "specparam" | "static" | "string" | "strong" | "strong0" | "strong1" | "struct" | "super" | "supply0" | "supply1" | "sync_accept_on" | "sync_reject_on" | "table" | "tagged" | "task" | "this" | "throughout" | "time" | "timeprecision" | "timeunit" | "tran" | "tranif0" | "tranif1" | "tri" | "tri0" | "tri1" | "triand" | "trior" | "trireg" | "type" | "typedef" | "union" | "unique" | "unique0" | "unsigned" | "until" | "until_with" | "untyped" | "use" | "uwire" | "var" | "vectored" | "virtual" | "void" | "wait" | "wait_order" | "wand" | "weak" | "weak0" | "weak1" | "while" | "wildcard" | "wire" | "with" | "within" | "wor" | "xnor" | "xor" }
-identifier                = @{ !(keywords ~ !identifier_continue) ~ (simple_identifier | escaped_identifier) }
-quoted_string_item        = @{ !("\"" | NEWLINE | "\\") ~ ASCII }
-triple_quoted_string_item = @{ !"\\" ~ ASCII }
-COMMENT                   = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" | "/" ~ (!NEWLINE ~ ANY)* ~ NEWLINE }
-c_identifier              = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
-escaped_identifier        = @{ "\\" ~ !WHITESPACE ~ ASCII ~ WHITESPACE }
-simple_identifier         = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_" | "$")* }
-system_tf_identifier      = @{ "$" ~ (ASCII_ALPHANUMERIC | "_" | "$")+ }
-WHITESPACE                = _{ " " | "\t" | NEWLINE }
-string_escape_seq         = @{ "\\x" ~ ASCII_HEX_DIGIT{1, 2} | "\\" ~ ASCII_OCT_DIGIT{1, 3} | "\\" ~ ASCII }
-file_path_spec            =  { "/" | "\\" }
-identifier_continue       =  { ASCII_ALPHANUMERIC | "_" | "$" }
+keywords                                  =  { "accept_on" | "alias" | "always" | "always_comb" | "always_ff" | "always_latch" | "and" | "assert" | "assign" | "assume" | "automatic" | "before" | "begin" | "bind" | "bins" | "binsof" | "bit" | "break" | "buf" | "bufif0" | "bufif1" | "byte" | "case" | "casex" | "casez" | "cell" | "chandle" | "checker" | "class" | "clocking" | "cmos" | "config" | "const" | "constraint" | "context" | "continue" | "cover" | "covergroup" | "coverpoint" | "cross" | "deassign" | "default" | "defparam" | "design" | "disable" | "dist" | "do" | "edge" | "else" | "end" | "endcase" | "endchecker" | "endclass" | "endclocking" | "endconfig" | "endfunction" | "endgenerate" | "endgroup" | "endinterface" | "endmodule" | "endpackage" | "endprimitive" | "endprogram" | "endproperty" | "endspecify" | "endsequence" | "endtable" | "endtask" | "enum" | "event" | "eventually" | "expect" | "export" | "extends" | "extern" | "final" | "first_match" | "for" | "force" | "foreach" | "forever" | "fork" | "forkjoin" | "function" | "generate" | "genvar" | "global" | "highz0" | "highz1" | "if" | "iff" | "ifnone" | "ignore_bins" | "illegal_bins" | "implements" | "implies" | "import" | "incdir" | "include" | "initial" | "inout" | "input" | "inside" | "instance" | "int" | "integer" | "interconnect" | "interface" | "intersect" | "join" | "join_any" | "join_none" | "large" | "let" | "liblist" | "library" | "local" | "localparam" | "logic" | "longint" | "macromodule" | "matches" | "medium" | "modport" | "module" | "nand" | "negedge" | "nettype" | "new" | "nexttime" | "nmos" | "nor" | "noshowcancelled" | "not" | "notif0" | "notif1" | "null" | "or" | "output" | "package" | "packed" | "parameter" | "pmos" | "posedge" | "primitive" | "priority" | "program" | "property" | "protected" | "pull0" | "pull1" | "pulldown" | "pullup" | "pulsestyle_ondetect" | "pulsestyle_onevent" | "pure" | "rand" | "randc" | "randcase" | "randsequence" | "rcmos" | "real" | "realtime" | "ref" | "reg" | "reject_on" | "release" | "repeat" | "restrict" | "return" | "rnmos" | "rpmos" | "rtran" | "rtranif0" | "rtranif1" | "s_always" | "s_eventually" | "s_nexttime" | "s_until" | "s_until_with" | "scalared" | "sequence" | "shortint" | "shortreal" | "showcancelled" | "signed" | "small" | "soft" | "solve" | "specify" | "specparam" | "static" | "string" | "strong" | "strong0" | "strong1" | "struct" | "super" | "supply0" | "supply1" | "sync_accept_on" | "sync_reject_on" | "table" | "tagged" | "task" | "this" | "throughout" | "time" | "timeprecision" | "timeunit" | "tran" | "tranif0" | "tranif1" | "tri" | "tri0" | "tri1" | "triand" | "trior" | "trireg" | "type" | "typedef" | "union" | "unique" | "unique0" | "unsigned" | "until" | "until_with" | "untyped" | "use" | "uwire" | "var" | "vectored" | "virtual" | "void" | "wait" | "wait_order" | "wand" | "weak" | "weak0" | "weak1" | "while" | "wildcard" | "wire" | "with" | "within" | "wor" | "xnor" | "xor" }
+identifier                                = @{ !(keywords ~ !identifier_continue) ~ (simple_identifier | escaped_identifier) }
+quoted_string_item                        = @{ !("\"" | NEWLINE | "\\") ~ ASCII }
+triple_quoted_string_item                 = @{ !"\\" ~ ASCII }
+COMMENT                                   = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" | "/" ~ (!NEWLINE ~ ANY)* ~ NEWLINE }
+c_identifier                              = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+escaped_identifier                        = @{ "\\" ~ !WHITESPACE ~ ASCII ~ WHITESPACE }
+simple_identifier                         = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_" | "$")* }
+system_tf_identifier                      = @{ "$" ~ (ASCII_ALPHANUMERIC | "_" | "$")+ }
+WHITESPACE                                = _{ " " | "\t" | NEWLINE }
+string_escape_seq                         = @{ "\\x" ~ ASCII_HEX_DIGIT{1, 2} | "\\" ~ ASCII_OCT_DIGIT{1, 3} | "\\" ~ ASCII }
+file_path_spec                            =  { "/" | "\\" }
+identifier_continue                       =  { ASCII_ALPHANUMERIC | "_" | "$" }
 
 block_event_expression = { ("begin" | "end") ~ hierarchical_btf_identifier ~ ("or" ~ block_event_expression)* }
 
@@ -1959,14 +1954,74 @@ event_expression_recursive = {
   | "," ~ event_expression
 }
 
-expression = { prefix? ~ primary ~ postfix? ~ (infix ~ prefix? ~ primary ~ postfix?)* }
+constant_primary      = _{ expression }
+constant_expression   = _{ expression }
+constant_select       = _{ select }
+constant_bit_select   = _{ bit_select }
+inc_or_dec_expression = _{ expression }
+
+prefix         = _{ prefix_inc | prefix_dec | reduction_xnor | reduction_nor | reduction_nand | positive | negative | not | bit_not | reduction_and | reduction_or | reduction_xor }
+positive       =  { "+" ~ attribute_instance* }
+negative       =  { "-" ~ attribute_instance* }
+not            =  { "!" ~ attribute_instance* }
+bit_not        =  { "~" ~ attribute_instance* }
+reduction_and  =  { "&" ~ attribute_instance* }
+reduction_nand =  { "~&" ~ attribute_instance* }
+reduction_or   =  { "|" ~ attribute_instance* }
+reduction_nor  =  { "~|" ~ attribute_instance* }
+reduction_xor  =  { "^" ~ attribute_instance* }
+reduction_xnor =  { ("~^" | "^~") ~ attribute_instance* }
+prefix_inc     =  { "++" ~ attribute_instance* }
+prefix_dec     =  { "--" ~ attribute_instance* }
+
+add          = { "+" ~ attribute_instance* }
+sub          = { "-" ~ attribute_instance* }
+mul          = { "*" ~ attribute_instance* }
+div          = { "/" ~ attribute_instance* }
+mod          = { "%" ~ attribute_instance* }
+eq           = { "==" ~ attribute_instance* }
+neq          = { "!=" ~ attribute_instance* }
+case_eq      = { "===" ~ attribute_instance* }
+case_neq     = { "!==" ~ attribute_instance* }
+wildcard_eq  = { "==?" ~ attribute_instance* }
+wildcard_neq = { "!=?" ~ attribute_instance* }
+and          = { "&&" ~ attribute_instance* }
+or           = { "||" ~ attribute_instance* }
+pow          = { "**" ~ attribute_instance* }
+lt           = { "<" ~ attribute_instance* }
+le           = { "<=" ~ attribute_instance* }
+gt           = { ">" ~ attribute_instance* }
+ge           = { ">=" ~ attribute_instance* }
+bit_and      = { "&" ~ attribute_instance* }
+bit_or       = { "|" ~ attribute_instance* }
+bit_xor      = { "^" ~ attribute_instance* }
+bit_xnor     = { ("^~" | "~^") ~ attribute_instance* }
+rshift       = { ">>" ~ attribute_instance* }
+arith_rshift = { ">>>" ~ attribute_instance* }
+lshift       = { "<<" ~ attribute_instance* }
+arith_lshift = { "<<<" ~ attribute_instance* }
+implication  = { "->" ~ attribute_instance* }
+logical_eq   = { "<->" ~ attribute_instance* }
+
+postfix        = _{ postfix_inc | postfix_dec | cast_op | method_call_op }
+postfix_inc    =  { attribute_instance* ~ "++" }
+postfix_dec    =  { attribute_instance* ~ "--" }
+cast_op        =  { "'" ~ "(" ~ expression ~ ")" }
+method_call_op =  { "." ~ method_call_body }
+
+expression = { conditional_expression ~ ((implication | logical_eq) ~ conditional_expression)* }
+
+conditional_expression = { cond_predicate ~ ("?" ~ attribute_instance* ~ expression ~ ":" ~ expression)? }
+
+expression_or_cond_pattern = { or_expression ~ ("matches" ~ pattern)? }
+
+unary_expression = { prefix* ~ primary ~ postfix* }
 
 method_call  = { implicit_class_handle ~ "." ~ method_call_body }
 casting_type = { simple_type | signing | "string" | "const" }
 primary      = {
     "(" ~ operator_assignment ~ ")"
   | tagged_union_expression
-  | inc_or_dec_expression
   | primary_literal
   | (package_scope | class_qualifier)? ~ hierarchical_identifier ~ select
   | empty_unpacked_array_concatenation
@@ -1990,91 +2045,17 @@ primary      = {
   | type_reference
 }
 
-prefix         = _{ reduction_xnor | reduction_nor | reduction_nand | positive | negative | not | bit_not | reduction_and | reduction_or | reduction_xor }
-positive       =  { "+" ~ attribute_instance* }
-negative       =  { "-" ~ attribute_instance* }
-not            =  { "!" ~ attribute_instance* }
-bit_not        =  { "~" ~ attribute_instance* }
-reduction_and  =  { "&" ~ attribute_instance* }
-reduction_nand =  { "~&" ~ attribute_instance* }
-reduction_or   =  { "|" ~ attribute_instance* }
-reduction_nor  =  { "~|" ~ attribute_instance* }
-reduction_xor  =  { "^" ~ attribute_instance* }
-reduction_xnor =  { ("~^" | "^~") ~ attribute_instance* }
-
-infix             = _{
-    case_eq
-  | case_neq
-  | wildcard_eq
-  | wildcard_neq
-  | arithmetic_rshift
-  | arithmetic_lshift
-  | logical_eq
-  | triple_amp
-  | eq
-  | neq
-  | and
-  | or
-  | pow
-  | le
-  | ge
-  | bit_xnor
-  | rshift
-  | lshift
-  | implication
-  | cond_then
-  | cond_else
-  | add
-  | sub
-  | mul
-  | div
-  | mod
-  | lt
-  | gt
-  | bit_and
-  | bit_or
-  | bit_xor
+conditional_statement   = {
+    unique_priority? ~ "if" ~ "(" ~ expression ~ ")" ~ statement_or_null ~ ("else" ~ "if" ~ "(" ~ expression ~ ")" ~ statement_or_null)* ~ ("else" ~ statement_or_null)?
 }
-cond_then         =  { "?" ~ attribute_instance* }
-cond_else         =  { ":" }
-add               =  { "+" ~ attribute_instance* }
-sub               =  { "-" ~ attribute_instance* }
-mul               =  { "*" ~ attribute_instance* }
-div               =  { "/" ~ attribute_instance* }
-mod               =  { "%" ~ attribute_instance* }
-eq                =  { "==" ~ attribute_instance* }
-neq               =  { "!=" ~ attribute_instance* }
-case_eq           =  { "===" ~ attribute_instance* }
-case_neq          =  { "!==" ~ attribute_instance* }
-wildcard_eq       =  { "==?" ~ attribute_instance* }
-wildcard_neq      =  { "!=?" ~ attribute_instance* }
-and               =  { "&&" ~ attribute_instance* }
-or                =  { "||" ~ attribute_instance* }
-pow               =  { "**" ~ attribute_instance* }
-lt                =  { "<" ~ attribute_instance* }
-le                =  { "<=" ~ attribute_instance* }
-gt                =  { ">" ~ attribute_instance* }
-ge                =  { ">=" ~ attribute_instance* }
-bit_and           =  { "&" ~ attribute_instance* }
-bit_or            =  { "|" ~ attribute_instance* }
-bit_xor           =  { "^" ~ attribute_instance* }
-bit_xnor          =  { ("^~" | "~^") ~ attribute_instance* }
-rshift            =  { ">>" ~ attribute_instance* }
-arithmetic_rshift =  { ">>>" ~ attribute_instance* }
-lshift            =  { "<<" ~ attribute_instance* }
-arithmetic_lshift =  { "<<<" ~ attribute_instance* }
-implication       =  { "->" ~ attribute_instance* }
-logical_eq        =  { "<->" ~ attribute_instance* }
-triple_amp        =  { "&&&" }
-
-postfix        = _{ inside | method_call_op | cond_pattern | cast_op }
-inside         =  { "inside" ~ "{" ~ range_list ~ "}" }
-method_call_op =  { "." ~ method_call_body }
-cond_pattern   =  { "matches" ~ pattern }
-cast_op        =  { "'" ~ "(" ~ expression ~ ")" }
-
-cond_predicate      = _{ expression }
-constant_expression = _{ expression }
-constant_primary    = _{ expression }
-constant_select     = _{ select }
-constant_bit_select = _{ bit_select }
+or_expression           = { and_expression ~ ((or) ~ and_expression)* }
+and_expression          = { bit_or_expression ~ ((and) ~ bit_or_expression)* }
+bit_or_expression       = { bit_xnor_expression ~ ((bit_or) ~ bit_xnor_expression)* }
+bit_xnor_expression     = { bit_and_expression ~ ((bit_xnor | bit_xor) ~ bit_and_expression)* }
+bit_and_expression      = { case_eq_expression ~ ((bit_and) ~ case_eq_expression)* }
+case_eq_expression      = { le_expression ~ ((case_eq | case_neq | wildcard_eq | wildcard_neq | eq | neq) ~ le_expression)* }
+le_expression           = { arith_lshift_expression ~ (((le | ge | lt | gt) ~ arith_lshift_expression) | ("inside" ~ "{" ~ range_list ~ "}"))* }
+arith_lshift_expression = { add_expression ~ ((arith_lshift | arith_rshift | lshift | rshift) ~ add_expression)* }
+add_expression          = { mul_expression ~ ((add | sub) ~ mul_expression)* }
+mul_expression          = { pow_expression ~ ((mul | div | mod) ~ pow_expression)* }
+pow_expression          = { unary_expression ~ ((pow) ~ unary_expression)* }
